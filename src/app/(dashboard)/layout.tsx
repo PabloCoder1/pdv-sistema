@@ -1,16 +1,23 @@
 // src/app/(dashboard)/layout.tsx
-import { Sidebar } from "@/components/layout/Sidebar";
+'use client';
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+import { useAuth } from '@/contexts/AuthContext';
+import { Sidebar } from '@/components/Sidebar'; 
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const { loading, lojaSuspensa } = useAuth();
+
+  // A TRAVA DE SEGURANÇA (O Porteiro)
+  if (loading || lojaSuspensa) {
+    return null; 
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="flex h-screen overflow-hidden bg-slate-50">
       <Sidebar />
-      {/* O main empurra o conteúdo para a direita, dando espaço para a sidebar fixa de 64 (16rem/256px) */}
-      <main className="flex-1 ml-64 p-8">
+
+      {/* ADICIONAMOS O p-8 AQUI PARA DAR O ESPAÇAMENTO (RESPIRO) */}
+      <main className="flex-1 overflow-y-auto p-8 ml-64">
         {children}
       </main>
     </div>

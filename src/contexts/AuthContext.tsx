@@ -1,14 +1,16 @@
 // src/contexts/AuthContext.tsx
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Perfil } from '@/types';
+import { useRouter, usePathname } from 'next/navigation';
 
 interface AuthContextData {
-  user: any | null; // Dados básicos do Supabase Auth (e-mail, etc)
-  perfil: Perfil | null; // Nossos dados de negócio (Cargo, Loja, etc)
+  user: any | null;
+  perfil: Perfil | null;
   loading: boolean;
+  lojaSuspensa: boolean;
   signOut: () => Promise<void>;
 }
 
@@ -18,59 +20,106 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any | null>(null);
   const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [loading, setLoading] = useState(true);
+  const [lojaSuspensa, setLojaSuspensa] = useState(false);
 
-  useEffect(() => {
-    // 1. Função para carregar o Perfil da nossa tabela
-    const loadPerfil = async (userId: string) => {
-      const { data, error } = await supabase
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // Função única e blindada para carregar todo o contexto do usuário
+  const loadPerfilCompleto = useCallback(async (userId: string) => {
+    try {
+      const { data: pData, error: pError } = await supabase
         .from('perfis')
         .select('*')
         .eq('id', userId)
         .single();
 
-      if (!error && data) {
-        setPerfil(data as Perfil);
+      if (pError || !pData) throw pError;
+
+      const p = pData as Perfil;
+      setPerfil(p);
+
+      // Regra de suspensão: Admin nunca é bloqueado
+      if (p.loja_id && p.cargo !== 'Administrador') {
+        const { data: loja } = await supabase
+          .from('lojas')
+          .select('ativa')
+          .eq('id', p.loja_id)
+          .single();
+        
+        setLojaSuspensa(loja?.ativa === false);
+      } else {
+        setLojaSuspensa(false);
       }
+    } catch (err) {
+      console.error("Erro ao sincronizar perfil/loja:", err);
+      setPerfil(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const initAuth = async () => {
+      setLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (mounted && session?.user) {
+        setUser(session.user);
+        await loadPerfilCompleto(session.user.id);
+      }
+      if (mounted) setLoading(false);
     };
 
-    // 2. Verifica a sessão atual ao abrir o app
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        loadPerfil(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
+    initAuth();
 
-    // 3. Fica escutando mudanças (ex: usuário fez login ou logout)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setUser(session?.user ?? null);
+      async (event, session) => {
+        if (!mounted) return;
+        
         if (session?.user) {
-          loadPerfil(session.user.id).then(() => setLoading(false));
+          setUser(session.user);
+          setLoading(true);
+          await loadPerfilCompleto(session.user.id);
+          setLoading(false);
         } else {
+          setUser(null);
           setPerfil(null);
+          setLojaSuspensa(false);
           setLoading(false);
         }
       }
     );
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [loadPerfilCompleto]);
+
+  // Controlador de Tráfego Automático
+  useEffect(() => {
+    if (loading) return;
+
+    if (lojaSuspensa && pathname !== '/suspensa') {
+      router.replace('/suspensa'); // Use replace para não criar histórico da página bloqueada
+    } else if (!lojaSuspensa && pathname === '/suspensa' && perfil) {
+      router.replace('/');
+    } else if (perfil?.cargo === 'Colaborador' && pathname === '/') {
+      router.replace('/pdv');
+    }
+  }, [perfil, lojaSuspensa, pathname, loading, router]);
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    window.location.href = '/login';
   };
 
   return (
-    <AuthContext.Provider value={{ user, perfil, loading, signOut }}>
+    <AuthContext.Provider value={{ user, perfil, loading, lojaSuspensa, signOut }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-// Hook customizado para usarmos em qualquer página de forma simples
 export const useAuth = () => useContext(AuthContext);

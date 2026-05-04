@@ -2,7 +2,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   // Inicializa a resposta que será modificada e retornada
   let supabaseResponse = NextResponse.next({
     request,
@@ -18,12 +18,14 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          // Atualiza os cookies na requisição (para os Server Components lerem)
+          // IMPORTANTE: Só atualizamos se houver mudança real
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          // Atualiza a resposta (para o navegador salvar os cookies)
+          
+          // Criamos a resposta baseada na requisição atualizada
           supabaseResponse = NextResponse.next({
             request,
           })
+
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           )
@@ -65,6 +67,5 @@ export const config = {
      * - Otimização de imagens (_next/image)
      * - Favicon e extensões de imagem comuns
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+'/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',  ],
 }

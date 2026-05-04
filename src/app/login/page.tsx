@@ -26,7 +26,8 @@ export default function LoginPage() {
       setError('Credenciais inválidas. Tente novamente.');
       setLoading(false);
     } else {
-      // Se o login der certo, joga o usuário para o painel principal (PDV)
+      // Força o roteador a ler os novos cookies antes de navegar
+      router.refresh();
       router.push('/');
     }
   };

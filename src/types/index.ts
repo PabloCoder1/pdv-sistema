@@ -7,33 +7,40 @@ export interface Loja {
   nome: string;
   endereco: string | null;
   created_at: string;
+  ativa: boolean; // CORRIGIDO: campo existia no banco mas faltava no tipo
 }
 
 export interface Perfil {
   id: string;
   nome: string;
   cargo: Cargo;
-  loja_id: string | null; // Null se for Admin
-  created_at: string;
+  loja_id?: string | null;
+  avatar_url?: string | null;
+  ativo?: boolean;
 }
 
 export interface Produto {
   id: string;
-  loja_id: string; // Agora todo produto pertence a uma loja
-  codigo_barras: string | null;
   nome: string;
+  codigo_barras?: string | null;
   preco: number;
+  preco_custo: number;
   estoque_atual: number;
+  loja_id: string;
   ativo: boolean;
-  created_at: string;
+  imagem_url?: string | null;
+  created_at?: string;
 }
 
 export interface Venda {
   id: string;
-  loja_id: string; // Venda atrelada ao faturamento da loja
+  loja_id: string;
   usuario_id: string;
   total: number;
+  desconto: number;       // NOVO: suporte a desconto
   metodo_pagamento: string;
+  valor_recebido?: number; // NOVO: para cálculo de troco
+  status: 'concluida' | 'cancelada'; // NOVO: status da venda
   created_at: string;
 }
 
@@ -43,5 +50,15 @@ export interface ItemVenda {
   produto_id: string;
   quantidade: number;
   preco_unitario: number;
+  preco_custo: number;    // NOVO: snapshot do custo no momento da venda
+  subtotal: number;
+}
+
+// Payload enviado para a RPC de venda atômica
+export interface ItemVendaPayload {
+  produto_id: string;
+  quantidade: number;
+  preco_unitario: number;
+  preco_custo: number;
   subtotal: number;
 }
