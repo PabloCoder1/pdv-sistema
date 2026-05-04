@@ -76,7 +76,7 @@ export default function ColaboradoresPage() {
     try {
       const targetLojaId = isAdmin ? lojaSelecionada : perfil?.loja_id;
 
-      if (!targetLojaId && cargo !== 'Administrador') {
+      if (!targetLojaId && (cargo as string) !== 'Administrador') {
         throw new Error('Selecione uma loja para o colaborador.');
       }
 
